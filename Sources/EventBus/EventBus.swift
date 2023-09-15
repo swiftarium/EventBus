@@ -1,8 +1,8 @@
 public final class EventBus {
     public static let shared: EventBus = .init()
 
-    public typealias EventCallback<Subscriber: AnyObject, Event: EventProtocol> = ((subscriber: Subscriber, payload: Event.Payload)) -> Void
-    public typealias AnyEventCallback = ((subscriber: AnyObject?, payload: Any)) -> Void
+    public typealias EventCallback<Subscriber: AnyObject, Event: EventProtocol> = (_ subscriber: Subscriber, _ payload: Event.Payload) -> Void
+    public typealias AnyEventCallback = (_ subscriber: AnyObject?, _ payload: Any) -> Void
     public typealias TokenProvider = () -> any SubscriptionToken
 
     public struct Config {
@@ -27,11 +27,12 @@ public final class EventBus {
         by subscriber: Subscriber?,
         _ callback: @escaping EventCallback<Subscriber, Event>
     ) {
-        let anyCallback: AnyEventCallback = { args in
-            if let subscriber = args.subscriber as? Subscriber,
-               let payload = args.payload as? Event.Payload
-            { callback((subscriber, payload)) }
+        let anyCallback: AnyEventCallback = { subscriber, payload in
+            if let subscriber = subscriber as? Subscriber,
+               let payload = payload as? Event.Payload
+            { callback(subscriber, payload) }
         }
+
         subscriptionsMap[Identifier(event), default: []].append(.init(
             token: nil,
             subscriber: .init(subscriber),
@@ -44,8 +45,8 @@ public final class EventBus {
         _ event: Event.Type,
         _ callback: @escaping (_ payload: Event.Payload) -> Void
     ) -> any SubscriptionToken {
-        let anyCallback: AnyEventCallback = { args in
-            if let payload = args.payload as? Event.Payload {
+        let anyCallback: AnyEventCallback = { _, payload in
+            if let payload = payload as? Event.Payload {
                 callback(payload)
             }
         }
@@ -61,24 +62,22 @@ public final class EventBus {
     }
 
     public func off<Subscriber: AnyObject, Event: EventProtocol>(_ event: Event.Type, by subscriber: Subscriber) {
-        subscriptionsMap[Identifier(event)]?.removeAll { $0.subscriber.isEmpty || $0.subscriber == subscriber }
+        subscriptionsMap[Identifier(event)]?.removeAll {
+            !isValid(subscription: $0) || $0.subscriber == subscriber
+        }
     }
 
     public func off<Token: SubscriptionToken, Event: EventProtocol>(_ event: Event.Type, by token: Token) {
-        subscriptionsMap[Identifier(event)]?.removeAll { $0.subscriber.isEmpty || token == $0.token }
+        subscriptionsMap[Identifier(event)]?.removeAll {
+            !isValid(subscription: $0) || token == $0.token
+        }
     }
 
     public func reset<Subscriber: AnyObject>(by subscriber: Subscriber) {
         subscriptionsMap.keys.forEach { key in
             subscriptionsMap[key]?.removeAll {
-                $0.subscriber.isEmpty || $0.subscriber == subscriber
+                !isValid(subscription: $0) || $0.subscriber == subscriber
             }
-        }
-    }
-
-    public func reset<Token: SubscriptionToken>(by token: Token) {
-        subscriptionsMap.keys.forEach { key in
-            subscriptionsMap[key]?.removeAll { token == $0.token }
         }
     }
 
@@ -86,12 +85,16 @@ public final class EventBus {
         let id = Identifier(event)
         let subscriptions = subscriptionsMap[id]
         subscriptionsMap[id] = subscriptions?.filter { subscription in
-            guard !subscription.subscriber.isEmpty || subscription.token != nil else { return false }
-            subscription.callback((subscription.subscriber.value, event.payload))
+            guard isValid(subscription: subscription) else { return false }
+            subscription.callback(subscription.subscriber.value, event.payload)
             return true
         }
         if let subscriptions, subscriptions.isEmpty {
             subscriptionsMap.removeValue(forKey: id)
         }
+    }
+
+    private func isValid(subscription: Subscription<AnyObject>) -> Bool {
+        return subscription.subscriber.value != nil || subscription.token != nil
     }
 }

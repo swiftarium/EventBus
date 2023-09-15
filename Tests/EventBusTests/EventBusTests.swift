@@ -121,34 +121,45 @@ final class EventBusTests: XCTestCase {
     func testReset() {
         let eventBus = EventBus()
 
-        eventBus.on(TestEvent.self) { _ in
+        let value = "Hello, World!"
+
+        let expectation = self.expectation(description: "reset")
+        expectation.expectedFulfillmentCount = 3
+
+        eventBus.on(TestEvent.self) { payload in
+            XCTAssertEqual(payload, value)
+            expectation.fulfill()
+        }
+
+        eventBus.on(TestEvent1.self) { payload in
+            XCTAssertEqual(payload, value)
+            expectation.fulfill()
+        }
+
+        eventBus.on(TestEvent2.self) { payload in
+            XCTAssertEqual(payload, value)
+            expectation.fulfill()
+        }
+
+        eventBus.on(TestEvent.self, by: self) { _, _ in
             XCTFail("Callback should not be called after unsubscribing")
         }
 
-        eventBus.on(TestEvent1.self) { _ in
+        eventBus.on(TestEvent1.self, by: self) { _, _ in
             XCTFail("Callback should not be called after unsubscribing")
         }
 
-        eventBus.on(TestEvent2.self) { _ in
-            XCTFail("Callback should not be called after unsubscribing")
-        }
-
-        eventBus.on(TestEvent.self, by: self) { _ in
-            XCTFail("Callback should not be called after unsubscribing")
-        }
-
-        eventBus.on(TestEvent1.self, by: self) { _ in
-            XCTFail("Callback should not be called after unsubscribing")
-        }
-
-        eventBus.on(TestEvent2.self, by: self) { _ in
+        eventBus.on(TestEvent2.self, by: self) { _, _ in
             XCTFail("Callback should not be called after unsubscribing")
         }
 
         eventBus.reset(by: self)
 
-        eventBus.emit(TestEvent(payload: "Hello, World!"))
+        eventBus.emit(TestEvent(payload: value))
+        eventBus.emit(TestEvent1(payload: value))
+        eventBus.emit(TestEvent2(payload: value))
         sleep(1)
+        waitForExpectations(timeout: 1.0)
     }
 
     func testWeakReferences() {

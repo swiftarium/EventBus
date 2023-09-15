@@ -1,8 +1,6 @@
 struct WeakRef<T: AnyObject> {
     weak var value: T?
 
-    var isEmpty: Bool { value == nil }
-
     init(_ value: T?) {
         self.value = value
     }
