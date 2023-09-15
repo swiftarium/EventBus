@@ -1,0 +1,16 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "WeakRef",
+        "repositoryURL": "https://github.com/swiftarium/WeakRef.git",
+        "state": {
+          "branch": null,
+          "revision": "51b7f0a1878905b92cb9ddd586b2f6af0a2281d9",
+          "version": "1.0.0"
+        }
+      }
+    ]
+  },
+  "version": 1
+}

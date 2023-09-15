@@ -1,3 +1,6 @@
+import WeakRef
+
+/// `EventBus` provides a centralized hub to dispatch and listen to events throughout an application.
 public final class EventBus {
     /// The shared instance of `EventBus`.
     public static let shared: EventBus = .init()
