@@ -2,7 +2,7 @@ public protocol SubscriptionToken {
     var id: String { get }
 }
 
-struct DefaultToken: SubscriptionToken {
+internal struct DefaultToken: SubscriptionToken {
     static var counter: UInt = 0
 
     let id: String

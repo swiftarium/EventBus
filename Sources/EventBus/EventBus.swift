@@ -1,5 +1,5 @@
 public final class EventBus {
-    static let shared: EventBus = .init()
+    public static let shared: EventBus = .init()
 
     private struct WeakRef<T: AnyObject> {
         weak var value: T?
@@ -42,7 +42,7 @@ public final class EventBus {
             { callback((subscriber, payload)) }
         }
         let subscription: Subscription<AnyObject> = Subscription(
-            token: tokenProvider(),
+            token: nil,
             subscriber: .init(subscriber),
             callback: anyCallback
         )
@@ -81,12 +81,13 @@ public final class EventBus {
 
     public func emit<Event: EventProtocol>(_ event: Event) {
         let id = Identifier(event)
-        subscriptionsMap[id] = subscriptionsMap[id]?.filter { subscription in
-            guard let subscriber = subscription.subscriber.value else { return false }
-            subscription.callback((subscriber, event.payload))
+        let subscriptions = subscriptionsMap[id]
+        subscriptionsMap[id] = subscriptions?.filter { subscription in
+            guard subscription.subscriber.isAlive || subscription.token != nil else { return false }
+            subscription.callback((subscription.subscriber.value, event.payload))
             return true
         }
-        if let subscriptions = subscriptionsMap[id], subscriptions.isEmpty {
+        if let subscriptions, subscriptions.isEmpty {
             subscriptionsMap.removeValue(forKey: id)
         }
     }

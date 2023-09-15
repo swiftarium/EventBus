@@ -1,4 +1,4 @@
-struct Identifier: Hashable {
+internal struct Identifier: Hashable {
     private let identifier: String
 
     init<T>(_ target: T.Type) {
