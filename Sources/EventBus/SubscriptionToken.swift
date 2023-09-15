@@ -1,3 +1,6 @@
+/// A protocol for subscription tokens used by `EventBus`.
+///
+/// Conforming types must provide a unique identifier and can be compared for equality.
 public protocol SubscriptionToken: Equatable {
     var id: String { get }
 
