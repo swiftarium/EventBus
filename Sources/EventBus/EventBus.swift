@@ -1,15 +1,6 @@
 public final class EventBus {
     public static let shared: EventBus = .init()
 
-    private struct WeakRef<T: AnyObject> {
-        weak var value: T?
-        var isAlive: Bool { value != nil }
-
-        init(_ value: T?) {
-            self.value = value
-        }
-    }
-
     public typealias EventCallback<Subscriber: AnyObject, Event: EventProtocol> = ((subscriber: Subscriber, payload: Event.Payload)) -> Void
     public typealias AnyEventCallback = ((subscriber: AnyObject?, payload: Any)) -> Void
     public typealias TokenProvider = () -> any SubscriptionToken
@@ -33,7 +24,7 @@ public final class EventBus {
 
     public func on<Subscriber: AnyObject, Event: EventProtocol>(
         _ event: Event.Type,
-        by subscriber: Subscriber,
+        by subscriber: Subscriber?,
         _ callback: @escaping EventCallback<Subscriber, Event>
     ) {
         let anyCallback: AnyEventCallback = { args in
@@ -41,14 +32,14 @@ public final class EventBus {
                let payload = args.payload as? Event.Payload
             { callback((subscriber, payload)) }
         }
-        let subscription: Subscription<AnyObject> = Subscription(
+        subscriptionsMap[Identifier(event), default: []].append(.init(
             token: nil,
             subscriber: .init(subscriber),
             callback: anyCallback
-        )
-        subscriptionsMap[Identifier(event), default: []].append(subscription)
+        ))
     }
 
+    @discardableResult
     public func on<Event: EventProtocol>(
         _ event: Event.Type,
         _ callback: @escaping (_ payload: Event.Payload) -> Void
@@ -58,32 +49,44 @@ public final class EventBus {
                 callback(payload)
             }
         }
-        let subscription: Subscription<AnyObject> = Subscription(
-            token: tokenProvider(),
+
+        let token = tokenProvider()
+        subscriptionsMap[Identifier(event), default: []].append(.init(
+            token: token,
             subscriber: .init(nil),
             callback: anyCallback
-        )
-        subscriptionsMap[Identifier(event), default: []].append(subscription)
-        return subscription.token!
+        ))
+
+        return token
     }
 
-    public func off<Subscriber: AnyObject, Event: EventProtocol>(_ event: Event, by subscriber: Subscriber) {
-        subscriptionsMap[Identifier(event)]?.removeAll { !$0.subscriber.isAlive || $0.subscriber.value === subscriber }
+    public func off<Subscriber: AnyObject, Event: EventProtocol>(_ event: Event.Type, by subscriber: Subscriber) {
+        subscriptionsMap[Identifier(event)]?.removeAll { $0.subscriber.isEmpty || $0.subscriber == subscriber }
     }
 
-    public func reset(by subscriber: AnyObject) {
-        subscriptionsMap.keys.forEach { key in subscriptionsMap[key]?.removeAll { $0.subscriber.value === subscriber } }
+    public func off<Token: SubscriptionToken, Event: EventProtocol>(_ event: Event.Type, by token: Token) {
+        subscriptionsMap[Identifier(event)]?.removeAll { $0.subscriber.isEmpty || token == $0.token }
     }
 
-    public func reset(by token: SubscriptionToken) {
-        subscriptionsMap.keys.forEach { key in subscriptionsMap[key]?.removeAll { $0.token?.id == token.id } }
+    public func reset<Subscriber: AnyObject>(by subscriber: Subscriber) {
+        subscriptionsMap.keys.forEach { key in
+            subscriptionsMap[key]?.removeAll {
+                $0.subscriber.isEmpty || $0.subscriber == subscriber
+            }
+        }
+    }
+
+    public func reset<Token: SubscriptionToken>(by token: Token) {
+        subscriptionsMap.keys.forEach { key in
+            subscriptionsMap[key]?.removeAll { token == $0.token }
+        }
     }
 
     public func emit<Event: EventProtocol>(_ event: Event) {
         let id = Identifier(event)
         let subscriptions = subscriptionsMap[id]
         subscriptionsMap[id] = subscriptions?.filter { subscription in
-            guard subscription.subscriber.isAlive || subscription.token != nil else { return false }
+            guard !subscription.subscriber.isEmpty || subscription.token != nil else { return false }
             subscription.callback((subscription.subscriber.value, event.payload))
             return true
         }
