@@ -1,3 +1,4 @@
+import Dispatch
 import WeakRef
 
 /// `EventBus` provides a centralized hub to dispatch and listen to events throughout an application.
@@ -32,6 +33,10 @@ public final class EventBus {
     private var subscriptionsMap: [Identifier: [Subscription<AnyObject>]] = [:]
     private let tokenProvider: TokenProvider
 
+    private(set) var queue = DispatchQueue(label: "com.eventbus.queue", attributes: .concurrent)
+    private func read<T>(_ action: () -> T) -> T { queue.sync { action() } }
+    private func write<T>(_ action: () -> T) -> T { queue.sync(flags: .barrier) { action() } }
+
     init(config: Config? = nil) {
         self.tokenProvider = config?.tokenProvider ?? { DefaultToken() }
     }
@@ -59,12 +64,13 @@ public final class EventBus {
                let payload = payload as? Event.Payload
             { callback(subscriber, payload) }
         }
-
-        subscriptionsMap[Identifier(event), default: []].append(.init(
-            token: nil,
-            subscriber: .init(subscriber),
-            callback: anyCallback
-        ))
+        write {
+            subscriptionsMap[Identifier(event), default: []].append(.init(
+                token: nil,
+                subscriber: .init(subscriber),
+                callback: anyCallback
+            ))
+        }
     }
 
     /// Subscribe to a specific event type and get a token for the subscription.
@@ -91,14 +97,14 @@ public final class EventBus {
                 callback(payload)
             }
         }
-
         let token = tokenProvider()
-        subscriptionsMap[Identifier(event), default: []].append(.init(
-            token: token,
-            subscriber: .init(nil),
-            callback: anyCallback
-        ))
-
+        write {
+            subscriptionsMap[Identifier(event), default: []].append(.init(
+                token: token,
+                subscriber: .init(nil),
+                callback: anyCallback
+            ))
+        }
         return token
     }
 
@@ -108,8 +114,10 @@ public final class EventBus {
     ///   - event: Type of the event.
     ///   - subscriber: Object to unsubscribe.
     public func off<Subscriber: AnyObject, Event: EventProtocol>(_ event: Event.Type, by subscriber: Subscriber) {
-        subscriptionsMap[Identifier(event)]?.removeAll {
-            !isValid(subscription: $0) || $0.subscriber == subscriber
+        write {
+            subscriptionsMap[Identifier(event)]?.removeAll {
+                !isValid(subscription: $0) || $0.subscriber == subscriber
+            }
         }
     }
 
@@ -119,8 +127,10 @@ public final class EventBus {
     ///   - event: Type of the event.
     ///   - token: Token representing the subscription to be removed.
     public func off<Token: SubscriptionToken, Event: EventProtocol>(_ event: Event.Type, by token: Token) {
-        subscriptionsMap[Identifier(event)]?.removeAll {
-            !isValid(subscription: $0) || token == $0.token
+        write {
+            subscriptionsMap[Identifier(event)]?.removeAll {
+                !isValid(subscription: $0) || token == $0.token
+            }
         }
     }
 
@@ -129,9 +139,11 @@ public final class EventBus {
     /// - Parameters:
     ///   - subscriber: The subscriber whose subscriptions should be reset.
     public func reset<Subscriber: AnyObject>(by subscriber: Subscriber) {
-        subscriptionsMap.keys.forEach { key in
-            subscriptionsMap[key]?.removeAll {
-                !isValid(subscription: $0) || $0.subscriber == subscriber
+        write {
+            subscriptionsMap.keys.forEach { key in
+                subscriptionsMap[key]?.removeAll {
+                    !isValid(subscription: $0) || $0.subscriber == subscriber
+                }
             }
         }
     }
@@ -146,19 +158,13 @@ public final class EventBus {
     ///   eventBus.emit(UserLoggedIn(payload: user))
     ///   ```
     public func emit<Event: EventProtocol>(_ event: Event) {
-        let id = Identifier(event)
-        let subscriptions = subscriptionsMap[id]
-        subscriptionsMap[id] = subscriptions?.filter { subscription in
-            guard isValid(subscription: subscription) else { return false }
+        read { subscriptionsMap[Identifier(event)] }?.forEach { subscription in
+            guard isValid(subscription: subscription) else { return }
             subscription.callback(subscription.subscriber.value, event.payload)
-            return true
-        }
-        if let subscriptions, subscriptions.isEmpty {
-            subscriptionsMap.removeValue(forKey: id)
         }
     }
 
     private func isValid(subscription: Subscription<AnyObject>) -> Bool {
-        return subscription.subscriber.value != nil || subscription.token != nil
+        return subscription.subscriber.hasValue || subscription.token != nil
     }
 }

@@ -2,6 +2,8 @@
 import XCTest
 
 final class EventBusTests: XCTestCase {
+    var eventBus: EventBus!
+    
     struct TestEvent: EventProtocol {
         typealias Payload = String
         let payload: Payload
@@ -28,10 +30,13 @@ final class EventBusTests: XCTestCase {
     class TestSubscriber {}
     class TestSubscriber1 {}
     class TestSubscriber2 {}
+    
+    override func setUp() {
+        super.setUp()
+        eventBus = EventBus()
+    }
 
     func testSubscriber() {
-        let eventBus = EventBus()
-
         let value = "Hello, World!"
 
         let expectation = self.expectation(description: "subscribe")
@@ -52,8 +57,6 @@ final class EventBusTests: XCTestCase {
     }
 
     func testMultipleEmit() {
-        let eventBus = EventBus()
-
         let expectation = self.expectation(description: "multiple emit")
 
         let count = 10
@@ -76,8 +79,6 @@ final class EventBusTests: XCTestCase {
     }
 
     func testMultipleEventTypes() {
-        let eventBus = EventBus()
-
         let expectation1 = self.expectation(description: "test event1 emit")
         let expectation2 = self.expectation(description: "test event2 emit")
 
@@ -101,19 +102,19 @@ final class EventBusTests: XCTestCase {
     }
 
     func testUnsubscribe() {
-        let eventBus = EventBus()
-
         let token = eventBus.on(TestEvent.self) { _ in
             XCTFail("Callback should not be called after unsubscribing")
         }
+        eventBus.off(TestEvent.self, by: token)
+        eventBus.emit(TestEvent(payload: "Hello, World!"))
+        sleep(1)
+    }
 
+    func testUnsubscribeWithObject() {
         eventBus.on(TestEvent.self, by: self) { _, _ in
             XCTFail("Callback should not be called after unsubscribing")
         }
-
-        eventBus.off(TestEvent.self, by: token)
         eventBus.off(TestEvent.self, by: self)
-
         eventBus.emit(TestEvent(payload: "Hello, World!"))
         sleep(1)
     }
