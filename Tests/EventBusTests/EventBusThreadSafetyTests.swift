@@ -22,10 +22,18 @@ final class EventBusThreadSafetyTests: XCTestCase {
     func testConcurrentSubscribes() {
         let iterations = 100000
         let expect = expectation(description: "Concurrent subscribes")
-        expect.expectedFulfillmentCount = iterations
+        expect.expectedFulfillmentCount = iterations * 2
 
-        DispatchQueue.concurrentPerform(iterations: iterations) { _ in
+        let subscribers = (1...iterations).map { _ in TestSubscriber() }
+        DispatchQueue.concurrentPerform(iterations: iterations) { iteration in
             eventBus.on(TestEvent.self) { payload in
+                XCTAssertNotNil(payload.number)
+                expect.fulfill()
+            }
+
+            let subscriber = subscribers[iteration]
+            eventBus.on(TestEvent.self, by: subscriber) { sub, payload in
+                XCTAssertIdentical(subscriber, sub)
                 XCTAssertNotNil(payload.number)
                 expect.fulfill()
             }

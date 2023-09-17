@@ -37,7 +37,7 @@ final class EventBusTests: XCTestCase {
         eventBus = EventBus()
     }
 
-    func testSubscriber() {
+    func testSubscribe() {
         let expect = expectation(description: "subscribe")
         expect.expectedFulfillmentCount = 2
 
@@ -53,6 +53,16 @@ final class EventBusTests: XCTestCase {
 
         eventBus.emit(TestEvent(payload: value))
         waitForExpectations(timeout: 1.0)
+    }
+    
+    func testSubscriberIsNil() {
+        let optionalSubscriber: TestSubscriber? = nil
+        eventBus.on(TestEvent.self, by: optionalSubscriber) { subscriber, payload in
+            XCTFail("Callback should not be called if subscriber not exists")
+        }
+
+        eventBus.emit(TestEvent(payload: value))
+        sleep(1)
     }
 
     func testMultipleSubscribeByToken() {
@@ -71,16 +81,18 @@ final class EventBusTests: XCTestCase {
         waitForExpectations(timeout: 1.0)
     }
 
-    func testOneSubscriberPerEvent() {
-        let expect = expectation(description: "one subscriber per event")
-
-        eventBus.on(TestEvent.self, by: self) { _, _ in
-            XCTFail("Callback should not be called")
-        }
-
-        eventBus.on(TestEvent.self, by: self) { subscriber, payload in
-            XCTAssertEqual(payload, subscriber.value)
-            expect.fulfill()
+    func testMultipleSubscribeBySubscriber() {
+        let iterations = 100000
+        let expect = expectation(description: "multiple subscribe by subscriber")
+        expect.expectedFulfillmentCount = iterations
+        
+        let subscribers = (1...iterations).map { _ in TestSubscriber() }
+        subscribers.forEach { subscriber in
+            eventBus.on(TestEvent.self, by: subscriber) { [weak subscriber] sub, payload in
+                XCTAssertIdentical(subscriber, sub)
+                XCTAssertEqual(payload, self.value)
+                expect.fulfill()
+            }
         }
 
         eventBus.emit(TestEvent(payload: value))

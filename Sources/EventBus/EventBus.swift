@@ -22,16 +22,17 @@ public final class EventBus {
     /// Configuration settings for `EventBus`.
     public struct Config {
         /// An optional custom token provider.
-        let tokenProvider: TokenProvider?
+        var tokenProvider: TokenProvider?
+        var cleanFrequency: AutoCleaner.Frequency?
     }
 
-    private enum SubscriptionIdentifier: Hashable {
+    enum SubscriptionIdentifier: Hashable {
         case token(any SubscriptionToken)
         case subscriber(WeakRef<AnyObject>)
 
         var isValid: Bool {
             if case let .subscriber(weakSubscriber) = self {
-                return weakSubscriber.hasValue
+                return weakSubscriber.isValid
             }
             return true
         }
@@ -50,18 +51,19 @@ public final class EventBus {
         func hash(into hasher: inout Hasher) {
             switch self {
             case let .token(token): hasher.combine(token.id)
-            case let .subscriber(subscriber): hasher.combine(subscriber)
+            case let .subscriber(subscriber): hasher.combine(subscriber.hashValue)
             }
         }
     }
 
-    private struct Subscription {
+    struct Subscription {
         var callback: AnyEventCallback
     }
 
-    private typealias SubscriptionWrapper = AutoCleaner<[SubscriptionIdentifier: Subscription]>
-    private var subscriptionsMap: [Identifier: SubscriptionWrapper] = [:]
-    private let tokenProvider: TokenProvider
+    typealias SubscriptionWrapper = AutoCleaner<[SubscriptionIdentifier: Subscription]>
+    var subscriptionsMap: [Identifier: SubscriptionWrapper] = [:]
+    let tokenProvider: TokenProvider
+    let cleanFrequency: AutoCleaner.Frequency
 
     private(set) var queue = DispatchQueue(label: "com.event-bus.queue", attributes: .concurrent)
     private func read<T>(_ action: () -> T) -> T { queue.sync { action() } }
@@ -69,6 +71,12 @@ public final class EventBus {
 
     public init(config: Config? = nil) {
         self.tokenProvider = config?.tokenProvider ?? { DefaultToken() }
+        self.cleanFrequency = config?.cleanFrequency ?? { count in
+            let interval = (min: 10.0, max: 120.0)
+            let rate = (interval.max - interval.min) / 100.0
+            let frequency = interval.max - (rate * Double(count))
+            return .seconds(Int(max(min(frequency, interval.max), interval.min)))
+        }
     }
 
     /// Subscribe to a specific event type, associating it with a subscriber.
@@ -217,17 +225,13 @@ public final class EventBus {
         let id = Identifier(event)
         if let cleaner = subscriptionsMap[id] {
             cleaner.update { collection in
+                guard collection[identifier] == nil else { return }
                 collection.updateValue(subscription, forKey: identifier)
             }
         } else {
             subscriptionsMap[id] = .init([identifier: subscription]) { element in
                 !element.key.isValid
-            }.start { count in
-                let interval = (min: 10.0, max: 120.0)
-                let rate = (interval.max - interval.min) / 100.0
-                let frequency = interval.max - (rate * Double(count))
-                return .seconds(Int(max(min(frequency, interval.max), interval.min)))
-            }
+            }.start(cleanFrequency)
         }
     }
 }
