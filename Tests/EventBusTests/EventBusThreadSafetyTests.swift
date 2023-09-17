@@ -12,25 +12,20 @@ final class EventBusThreadSafetyTests: XCTestCase {
 
     class TestSubscriber {}
 
-    private var eventBus: EventBus!
+    var eventBus: EventBus!
 
     override func setUp() {
         super.setUp()
         eventBus = EventBus()
     }
 
-    func testConcurrentSubscribe() {
+    func testConcurrentSubscribes() {
         let iterations = 100000
         let expect = expectation(description: "Concurrent subscribes")
-        expect.expectedFulfillmentCount = iterations * 2
+        expect.expectedFulfillmentCount = iterations
 
         DispatchQueue.concurrentPerform(iterations: iterations) { _ in
             eventBus.on(TestEvent.self) { payload in
-                XCTAssertNotNil(payload.number)
-                expect.fulfill()
-            }
-
-            eventBus.on(TestEvent.self, by: self) { _, payload in
                 XCTAssertNotNil(payload.number)
                 expect.fulfill()
             }
@@ -64,7 +59,7 @@ final class EventBusThreadSafetyTests: XCTestCase {
     }
 
     func testConcurrentUnsubscribes() {
-        let iterations = 1000
+        let iterations = 100000
         let expect = expectation(description: "Concurrent emissions")
         expect.expectedFulfillmentCount = iterations
 
@@ -86,15 +81,15 @@ final class EventBusThreadSafetyTests: XCTestCase {
             expect.fulfill()
         }
 
-        wait(for: [expect], timeout: 10)
+        wait(for: [expect], timeout: 2)
         eventBus.emit(TestEvent(payload: .init(number: 0)))
         sleep(1)
     }
 
     func testConcurrentResets() {
-        let iterations = 10000
-        let expectation = XCTestExpectation(description: "Concurrent resets")
-        expectation.expectedFulfillmentCount = iterations
+        let iterations = 100000
+        let expect = expectation(description: "Concurrent resets")
+        expect.expectedFulfillmentCount = iterations
 
         let subscriber = TestSubscriber()
 
@@ -106,10 +101,10 @@ final class EventBusThreadSafetyTests: XCTestCase {
 
         DispatchQueue.concurrentPerform(iterations: iterations) { _ in
             self.eventBus.reset(by: subscriber)
-            expectation.fulfill()
+            expect.fulfill()
         }
 
-        wait(for: [expectation], timeout: 10)
+        waitForExpectations(timeout: 2)
         eventBus.emit(TestEvent(payload: .init(number: 0)))
         sleep(1)
     }

@@ -3,7 +3,8 @@ import XCTest
 
 final class EventBusTests: XCTestCase {
     var eventBus: EventBus!
-    
+    let value = "Hello, World!"
+
     struct TestEvent: EventProtocol {
         typealias Payload = String
         let payload: Payload
@@ -30,69 +31,99 @@ final class EventBusTests: XCTestCase {
     class TestSubscriber {}
     class TestSubscriber1 {}
     class TestSubscriber2 {}
-    
+
     override func setUp() {
         super.setUp()
         eventBus = EventBus()
     }
 
     func testSubscriber() {
-        let value = "Hello, World!"
-
-        let expectation = self.expectation(description: "subscribe")
-        expectation.expectedFulfillmentCount = 2
+        let expect = expectation(description: "subscribe")
+        expect.expectedFulfillmentCount = 2
 
         eventBus.on(TestEvent.self) { payload in
-            XCTAssertEqual(payload, value)
-            expectation.fulfill()
+            XCTAssertEqual(payload, self.value)
+            expect.fulfill()
         }
 
-        eventBus.on(TestEvent.self, by: self) { _, payload in
-            XCTAssertEqual(payload, value)
-            expectation.fulfill()
+        eventBus.on(TestEvent.self, by: self) { subscriber, payload in
+            XCTAssertEqual(payload, subscriber.value)
+            expect.fulfill()
         }
 
         eventBus.emit(TestEvent(payload: value))
         waitForExpectations(timeout: 1.0)
     }
 
-    func testMultipleEmit() {
-        let expectation = self.expectation(description: "multiple emit")
+    func testMultipleSubscribeByToken() {
+        let iterations = 100000
+        let expect = expectation(description: "multiple subscribe by token")
+        expect.expectedFulfillmentCount = iterations
 
-        let count = 10
-        let value = "Hello, World!"
-        expectation.expectedFulfillmentCount = 10 * 2
+        for _ in 0 ..< iterations {
+            eventBus.on(TestEvent.self) { payload in
+                XCTAssertEqual(payload, self.value)
+                expect.fulfill()
+            }
+        }
+
+        eventBus.emit(TestEvent(payload: value))
+        waitForExpectations(timeout: 1.0)
+    }
+
+    func testOneSubscriberPerEvent() {
+        let expect = expectation(description: "one subscriber per event")
+
+        eventBus.on(TestEvent.self, by: self) { _, _ in
+            XCTFail("Callback should not be called")
+        }
+
+        eventBus.on(TestEvent.self, by: self) { subscriber, payload in
+            XCTAssertEqual(payload, subscriber.value)
+            expect.fulfill()
+        }
+
+        eventBus.emit(TestEvent(payload: value))
+        waitForExpectations(timeout: 1.0)
+    }
+
+    func testMultipleEmissions() {
+        let iterations = 10000
+        let expect = expectation(description: "multiple emit")
+        expect.expectedFulfillmentCount = iterations * 2
 
         eventBus.on(TestEvent.self) { payload in
-            XCTAssertEqual(payload, value)
-            expectation.fulfill()
+            XCTAssertEqual(payload, self.value)
+            expect.fulfill()
         }
 
-        eventBus.on(TestEvent.self, by: self) { _, payload in
-            XCTAssertEqual(payload, value)
-            expectation.fulfill()
+        eventBus.on(TestEvent.self, by: self) { subscriber, payload in
+            XCTAssertEqual(payload, subscriber.value)
+            expect.fulfill()
         }
 
-        (0 ..< count).forEach { _ in eventBus.emit(TestEvent(payload: value)) }
+        for _ in 0 ..< iterations {
+            eventBus.emit(TestEvent(payload: value))
+        }
 
         waitForExpectations(timeout: 1.0)
     }
 
     func testMultipleEventTypes() {
-        let expectation1 = self.expectation(description: "test event1 emit")
-        let expectation2 = self.expectation(description: "test event2 emit")
+        let expect = expectation(description: "multiple event")
+        expect.expectedFulfillmentCount = 2
 
         let value1 = "Event1 Payload"
         let value2 = "Event2 Payload"
 
         eventBus.on(TestEvent1.self) { payload in
             XCTAssertEqual(payload, value1)
-            expectation1.fulfill()
+            expect.fulfill()
         }
 
         eventBus.on(TestEvent2.self) { payload in
             XCTAssertEqual(payload, value2)
-            expectation2.fulfill()
+            expect.fulfill()
         }
 
         eventBus.emit(TestEvent1(payload: value1))
@@ -120,26 +151,22 @@ final class EventBusTests: XCTestCase {
     }
 
     func testReset() {
-        let eventBus = EventBus()
-
-        let value = "Hello, World!"
-
-        let expectation = self.expectation(description: "reset")
-        expectation.expectedFulfillmentCount = 3
+        let expect = expectation(description: "reset")
+        expect.expectedFulfillmentCount = 3
 
         eventBus.on(TestEvent.self) { payload in
-            XCTAssertEqual(payload, value)
-            expectation.fulfill()
+            XCTAssertEqual(payload, self.value)
+            expect.fulfill()
         }
 
         eventBus.on(TestEvent1.self) { payload in
-            XCTAssertEqual(payload, value)
-            expectation.fulfill()
+            XCTAssertEqual(payload, self.value)
+            expect.fulfill()
         }
 
         eventBus.on(TestEvent2.self) { payload in
-            XCTAssertEqual(payload, value)
-            expectation.fulfill()
+            XCTAssertEqual(payload, self.value)
+            expect.fulfill()
         }
 
         eventBus.on(TestEvent.self, by: self) { _, _ in
@@ -164,13 +191,11 @@ final class EventBusTests: XCTestCase {
     }
 
     func testWeakReferences() {
-        let eventBus = EventBus()
+        let expect = expectation(description: "weak references")
+
         var subscriber1: TestSubscriber? = TestSubscriber()
         let subscriber2: TestSubscriber? = TestSubscriber()
         var subscriber3: TestSubscriber? = TestSubscriber()
-
-        let expectation = self.expectation(description: "weak references")
-        let value = "Hello, World!"
 
         eventBus.on(TestEvent.self, by: subscriber1) { _, _ in
             XCTFail("Callback should not be called after object is released")
@@ -178,8 +203,8 @@ final class EventBusTests: XCTestCase {
 
         eventBus.on(TestEvent.self, by: subscriber2) { [weak subscriber2] subscriber, payload in
             XCTAssertIdentical(subscriber, subscriber2)
-            XCTAssertEqual(payload, value)
-            expectation.fulfill()
+            XCTAssertEqual(payload, self.value)
+            expect.fulfill()
         }
 
         eventBus.on(TestEvent.self, by: subscriber3) { _, _ in
@@ -194,24 +219,20 @@ final class EventBusTests: XCTestCase {
     }
 
     func testCallbackPayload() {
-        let eventBus = EventBus()
-
-        let expectation = self.expectation(description: "callback")
-        expectation.expectedFulfillmentCount = 2
-
-        let value = "Hello, World!"
+        let expect = expectation(description: "callback")
+        expect.expectedFulfillmentCount = 2
 
         eventBus.on(TestEventWithCallback.self) { payload in
-            payload.handler(value)
+            payload.handler(self.value)
         }
 
-        eventBus.on(TestEventWithCallback.self, by: self) { _, payload in
-            payload.handler(value)
+        eventBus.on(TestEventWithCallback.self, by: self) { subscriber, payload in
+            payload.handler(subscriber.value)
         }
 
         eventBus.emit(TestEventWithCallback(payload: .init(handler: { string in
-            XCTAssertEqual(string, value)
-            expectation.fulfill()
+            XCTAssertEqual(string, self.value)
+            expect.fulfill()
         })))
 
         waitForExpectations(timeout: 1.0)
