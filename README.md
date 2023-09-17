@@ -1,28 +1,31 @@
 # EventBus
 
-`EventBus` provides a centralized hub for dispatching and listening to events throughout an application. Using this class allows for event-driven communication while maintaining loose coupling between objects.
+[한글문서 KOREAN](/README_ko.md)
 
+## Overview
 
-## Features
+`EventBus` is a Swift library that simplifies the implementation of event-based programming. It allows you to define, subscribe to, and publish events with ease.
 
-1. Concurrency Control: The EventBus supports concurrent access from multiple threads, ensuring thread safety.
-2. Memory Safety: Subscribers are stored as weak references, preventing memory leaks.
-3. Token & Subscriber Based Subscriptions: Subscribe to events using either a subscriber object or a token.
-4. Automatic Cleanup: Subscriptions that are no longer required are automatically cleaned up, enhancing memory efficiency.
+## Key Features
+
+- Define and publish events with type safety.
+- Store subscriber objects with weak references to prevent memory leaks.
+- Automatically remove the subscription when the subscriber object is deallocated.
+- Provide a thread-safety implementation to prevent concurrency issues in a multi-threaded environment.
 
 ## Installation
 
 ### Swift Package Manager
 
-To install `EventBus` into your Xcode project using SPM, add it to the dependencies value of your Package.swift:
+To install `EventBus` via SPM, add the following to the `dependencies` value of your `Package.swift`.
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/jinyongp/EventBus.git", from: "1.1.1"),
+    .package(url: "https://github.com/swiftarium/EventBus.git", from: "1.1.1"),
 ]
 ```
 
-And specify `"EventBus"` as a dependency of the Target in which you wish to use `EventBus`.
+Then, specify `"EventBus"` as a dependency for the target that will use it.
 
 ```swift
 targets: [
@@ -30,11 +33,19 @@ targets: [
 ]
 ```
 
-## Usage 
+## API Reference
 
-### Define an Event
+### EventProtocol
 
-To define a new event, conform to the `EventProtocol`:
+```swift
+protocol EventProtocol {
+    associatedtype Payload
+
+    var payload: Payload { get }
+}
+```
+
+`EventProtocol` is a protocol used to define new events. You can specify the type of `Payload` that will be sent when the event is triggered.
 
 ```swift
 struct UserLoggedIn: EventProtocol {
@@ -44,7 +55,7 @@ struct UserLoggedIn: EventProtocol {
 }
 ```
 
-A Payload can be defined another way.
+You can define the `Payload` in various ways other than using `typealias`.
 
 ```swift
 struct UserLoggedIn: EventProtocol {
@@ -54,71 +65,79 @@ struct UserLoggedIn: EventProtocol {
 
     let payload: Payload
 }
+```
 
+If you don't want to pass a `Payload`, use the `Void` type.
+
+```swift
 struct UserLoggedIn: EventProtocol {
-    struct Payload {
-        let completion: (User) -> Void
-    }
-
-    let payload: Payload
+    let payload: Void = ()
 }
 ```
 
-### Subscribe to an Event
-
-Using the shared EventBus instance, subscribe to the event:
+### EventBus
 
 ```swift
-EventBus.shared.on(UserLoggedIn.self, by: self) { subscriber, user in
-    print("\(user.name) has logged in!")
-}
+/// Subscribe to a given event.
+func on<Event>(Event.Type, (Event.Payload) -> Void) -> any SubscriptionToken
+func on<Subscriber, Event>(Event.Type, by: Subscriber?, EventCallback<Subscriber, Event>)
+
+/// Unsubscribe from a given event for a specific subscriber.
+func off<Token, Event>(Event.Type, by: Token)
+func off<Subscriber, Event>(Event.Type, by: Subscriber)
+
+/// Cancel all subscriptions for a given subscriber.
+func reset<Subscriber>(by: Subscriber)
+
+/// Publish a given event.
+func emit<Event>(Event)
 ```
 
-Or without specifying a subscriber:
+With `EventBus`, you can easily subscribe to and publish events. Access the shared instance through the `shared` type property.
 
 ```swift
+// Subscribe
 let token = EventBus.shared.on(UserLoggedIn.self) { user in
-    print("\(user.name) has logged in!")
+    print("\(user.name) has logged in.")
 }
+
+// Subscribe with a subscriber
+EventBus.shared.on(UserLoggedIn.self, by: self) { subscriber, user in
+    print("\(user.name) has logged in.")
+}
+
+// Publish
+EventBus.shared.emit(UserLoggedIn(payload: user)) 
 ```
 
-### Emit an Event
-
-To notify all subscribers of a particular event:
+You can unsubscribe by providing either the `SubscriptionToken` or the subscriber object.
 
 ```swift
-EventBus.shared.emit(UserLoggedIn(payload: user))
-```
+// Unsubscribe with a token
+EventBus.shared.off(UserLoggedIn.self, by: token)
 
-After the event is emitted, all subscribers will be notified.
-
-### Unsubscribe from an Event
-
-You can unsubscribe in multiple ways:
-
-Using a subscriber:
-
-```swift
+// Unsubscribe with a subscriber
 EventBus.shared.off(UserLoggedIn.self, by: self)
 ```
 
-Using a token:
+You can cancel all event subscriptions by providing the subscriber object.
 
 ```swift
-EventBus.shared.off(UserLoggedIn.self, by: token)
-```
-
-Or unsubscribe all events by passing subscriber
-
-```swift
+// Cancel all subscriptions
 EventBus.shared.reset(by: self)
 ```
 
-After unsubscribing, the subscriber will no longer be notified of the event.
+By passing `EventBus.Config`, you can create a new `EventBus` instance.
 
-## Test
+- `tokenProvider`: A closure that provides a token generator conforming to the `SubscriptionToken` protocol.
+- `cleanFrequency`: Specifies the frequency to clean up the subscriptions. Passes the current subscriber count and returns a value of type `DispatchTimeInterval`.
 
-To run the included tests, use the command:
+```swift
+let config = EventBus.Config(tokenProvider: customTokenProvider, cleanFrequency: customFrequency)
+let customEventBus = EventBus(config: config)
+```
+
+## Testing
 
 ```bash
 $ swift test
