@@ -1,6 +1,14 @@
 # EventBus
 
-The `EventBus` provides a centralized event dispatching system, allowing objects within an application to communicate without needing to have direct references to each other. Events can be defined, subscribed to, and emitted, facilitating loose coupling and clean architecture.
+`EventBus` provides a centralized hub for dispatching and listening to events throughout an application. Using this class allows for event-driven communication while maintaining loose coupling between objects.
+
+
+## Features
+
+1. Concurrency Control: The EventBus supports concurrent access from multiple threads, ensuring thread safety.
+2. Memory Safety: Subscribers are stored as weak references, preventing memory leaks.
+3. Token & Subscriber Based Subscriptions: Subscribe to events using either a subscriber object or a token.
+4. Automatic Cleanup: Subscriptions that are no longer required are automatically cleaned up, enhancing memory efficiency.
 
 ## Installation
 
@@ -18,7 +26,7 @@ dependencies: [
 
 ### Define an Event
 
-To define a new event, conform to the EventProtocol:
+To define a new event, conform to the `EventProtocol`:
 
 ```swift
 struct UserLoggedIn: EventProtocol {
@@ -71,8 +79,10 @@ let token = EventBus.shared.on(UserLoggedIn.self) { user in
 To notify all subscribers of a particular event:
 
 ```swift
-EventBus.shared.emit(UserLoggedIn(payload: someUser))
+EventBus.shared.emit(UserLoggedIn(payload: user))
 ```
+
+After the event is emitted, all subscribers will be notified.
 
 ### Unsubscribe from an Event
 
@@ -90,11 +100,13 @@ Using a token:
 EventBus.shared.off(UserLoggedIn.self, by: token)
 ```
 
-Or unsubscribe all events by using self
+Or unsubscribe all events by passing subscriber
 
 ```swift
 EventBus.shared.reset(by: self)
 ```
+
+After unsubscribing, the subscriber will no longer be notified of the event.
 
 ## Test
 
