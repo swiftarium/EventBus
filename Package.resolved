@@ -2,6 +2,15 @@
   "object": {
     "pins": [
       {
+        "package": "AutoCleaner",
+        "repositoryURL": "https://github.com/swiftarium/AutoCleaner.git",
+        "state": {
+          "branch": null,
+          "revision": "a734eb8adf1f031806e5d9fa00266d20e6d0f19b",
+          "version": "1.0.2"
+        }
+      },
+      {
         "package": "WeakRef",
         "repositoryURL": "https://github.com/swiftarium/WeakRef.git",
         "state": {
