@@ -18,7 +18,7 @@ To install `EventBus` into your Xcode project using SPM, add it to the dependenc
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/jinyongp/EventBus.git", from: "1.1.0"),
+    .package(url: "https://github.com/jinyongp/EventBus.git", from: "1.1.1"),
 ]
 ```
 
