@@ -26,36 +26,6 @@ public final class EventBus {
         var cleanFrequency: AutoCleaner.Frequency?
     }
 
-    enum SubscriptionIdentifier: Hashable {
-        case token(any SubscriptionToken)
-        case subscriber(WeakRef<AnyObject>)
-
-        var isValid: Bool {
-            if case let .subscriber(weakSubscriber) = self {
-                return weakSubscriber.isValid
-            }
-            return true
-        }
-
-        static func == (lhs: EventBus.SubscriptionIdentifier, rhs: EventBus.SubscriptionIdentifier) -> Bool {
-            switch (lhs, rhs) {
-            case let (.token(lhsToken), .token(rhsToken)):
-                return lhsToken.id == rhsToken.id
-            case let (.subscriber(lhsSubscriber), .subscriber(rhsSubscriber)):
-                return lhsSubscriber == rhsSubscriber
-            default:
-                return false
-            }
-        }
-
-        func hash(into hasher: inout Hasher) {
-            switch self {
-            case let .token(token): hasher.combine(token.id)
-            case let .subscriber(subscriber): hasher.combine(subscriber.hashValue)
-            }
-        }
-    }
-
     struct Subscription {
         var callback: AnyEventCallback
     }
@@ -102,9 +72,11 @@ public final class EventBus {
                let payload = payload as? Event.Payload
             { callback(subscriber, payload) }
         }
-        let subscription: Subscription = .init(callback: anyCallback)
-        let identifier: SubscriptionIdentifier = .subscriber(.init(subscriber))
-        write { updateSubscription(subscription, for: identifier, in: event) }
+        write {
+            let subscription: Subscription = .init(callback: anyCallback)
+            let identifier: SubscriptionIdentifier = .subscriber(.init(subscriber))
+            updateSubscription(subscription, for: identifier, in: event)
+        }
     }
 
     /// Subscribe to a specific event type and get a token for the subscription.
@@ -132,19 +104,10 @@ public final class EventBus {
             }
         }
         return write {
-            let id = Identifier(event)
             let token = tokenProvider()
             let subscription: Subscription = .init(callback: anyCallback)
             let identifier: SubscriptionIdentifier = .token(token)
-            if let cleaner = subscriptionsMap[id] {
-                cleaner.update { collection in
-                    collection.updateValue(subscription, forKey: identifier)
-                }
-            } else {
-                subscriptionsMap[id] = .init([identifier: subscription], condition: { element in
-                    !element.key.isValid
-                })
-            }
+            updateSubscription(subscription, for: identifier, in: event.self)
             return token
         }
     }
@@ -157,9 +120,7 @@ public final class EventBus {
     public func off<Subscriber: AnyObject, Event: EventProtocol>(_ event: Event.Type, by subscriber: Subscriber) {
         write {
             let identifier: SubscriptionIdentifier = .subscriber(.init(subscriber))
-            subscriptionsMap[Identifier(event)]?.update { collection in
-                collection.removeValue(forKey: identifier)
-            }
+            subscriptionsMap[Identifier(event)]?.items.removeValue(forKey: identifier)
         }
     }
 
@@ -171,9 +132,7 @@ public final class EventBus {
     public func off<Token: SubscriptionToken, Event: EventProtocol>(_ event: Event.Type, by token: Token) {
         write {
             let identifier: SubscriptionIdentifier = .token(token)
-            subscriptionsMap[Identifier(event)]?.update { collection in
-                collection.removeValue(forKey: identifier)
-            }
+            subscriptionsMap[Identifier(event)]?.items.removeValue(forKey: identifier)
         }
     }
 
@@ -185,9 +144,7 @@ public final class EventBus {
         write {
             subscriptionsMap.keys.forEach { key in
                 let identifier: SubscriptionIdentifier = .subscriber(.init(subscriber))
-                subscriptionsMap[key]?.update { collection in
-                    collection.removeValue(forKey: identifier)
-                }
+                subscriptionsMap[key]?.items.removeValue(forKey: identifier)
             }
         }
     }
@@ -202,13 +159,11 @@ public final class EventBus {
     ///   eventBus.emit(UserLoggedIn(payload: user))
     ///   ```
     public func emit<Event: EventProtocol>(_ event: Event) {
-        let subscriptionMaps = read {
+        read {
             let subscriptionWrapper = subscriptionsMap[Identifier(event)]
             subscriptionWrapper?.clean()
-            return subscriptionWrapper?.collection.elements
-        }
-
-        subscriptionMaps?.forEach { identifier, subscription in
+            return subscriptionWrapper?.items
+        }?.forEach { identifier, subscription in
             guard identifier.isValid else { return }
             switch identifier {
             case .token: subscription.callback(nil, event.payload)
@@ -224,10 +179,7 @@ public final class EventBus {
     ) {
         let id = Identifier(event)
         if let cleaner = subscriptionsMap[id] {
-            cleaner.update { collection in
-                guard collection[identifier] == nil else { return }
-                collection.updateValue(subscription, forKey: identifier)
-            }
+            cleaner.items.updateValue(subscription, forKey: identifier)
         } else {
             subscriptionsMap[id] = .init([identifier: subscription]) { element in
                 !element.key.isValid
