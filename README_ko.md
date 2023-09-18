@@ -15,7 +15,7 @@
 
 ### Swift Package Manager
 
-SPM으로 `EventBus`를 설치하려면 `Package.swift`의 `dependencies` 값에 추가하세요.
+SPM으로 `EventBus`를 설치하려면 `Package.swift`의 `dependencies` 배열에 추가하세요.
 
 ```swift
 dependencies: [
@@ -46,7 +46,7 @@ protocol EventProtocol {
 `EventProtocol`은 새로운 이벤트를 정의하기 위한 프로토콜입니다. 이벤트 발생 시 전달할 `Payload` 유형을 지정할 수 있습니다.
 
 ```swift
-struct UserLoggedIn: EventProtocol {
+struct UserLoggedInEvent: EventProtocol {
     typealias Payload = User
 
     let payload: Payload
@@ -56,7 +56,7 @@ struct UserLoggedIn: EventProtocol {
 `typealias` 외에 다양한 방법으로 `Payload`를 정의할 수 있습니다.
 
 ```swift
-struct UserLoggedIn: EventProtocol {
+struct UserLoggedInEvent: EventProtocol {
     struct Payload {
         let user: User
     }
@@ -68,7 +68,7 @@ struct UserLoggedIn: EventProtocol {
 `Payload`를 전달하고 싶지 않다면 `Void` 타입을 사용하세요.
 
 ```swift
-struct UserLoggedIn: EventProtocol {
+struct UserLoggedInEvent: EventProtocol {
     let payload: Void = ()
 }
 ```
@@ -95,27 +95,27 @@ func emit<Event>(Event)
 
 ```swift
 // 구독
-let token = EventBus.shared.on(UserLoggedIn.self) { user in
+let token = EventBus.shared.on(UserLoggedInEvent.self) { user in
     print("\(user.name) 님이 로그인 했습니다.")
 }
 
 // 구독 (구독자 지정)
-EventBus.shared.on(UserLoggedIn.self, by: self) { subscriber, user in
+EventBus.shared.on(UserLoggedInEvent.self, by: self) { subscriber, user in
     print("\(user.name) 님이 로그인 했습니다.")
 }
 
 // 발행
-EventBus.shared.emit(UserLoggedIn(payload: user)) 
+EventBus.shared.emit(UserLoggedInEvent(payload: user)) 
 ```
 
 구독을 해제하기 위해 `SubscriptionToken` 혹은 구독자 객체를 전달할 수 있습니다.
 
 ```swift
 // 구독 해제 (토큰 전달)
-EventBus.shared.off(UserLoggedIn.self, by: token)
+EventBus.shared.off(UserLoggedInEvent.self, by: token)
 
 // 구독 해제 (구독자 전달)
-EventBus.shared.off(UserLoggedIn.self, by: self)
+EventBus.shared.off(UserLoggedInEvent.self, by: self)
 ```
 
 구독자 객체를 전달하여 모든 이벤트 구독을 해제할 수 있습니다.

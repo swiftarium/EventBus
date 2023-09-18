@@ -48,7 +48,7 @@ protocol EventProtocol {
 `EventProtocol` is a protocol used to define new events. You can specify the type of `Payload` that will be sent when the event is triggered.
 
 ```swift
-struct UserLoggedIn: EventProtocol {
+struct UserLoggedInEvent: EventProtocol {
     typealias Payload = User
 
     let payload: Payload
@@ -58,7 +58,7 @@ struct UserLoggedIn: EventProtocol {
 You can define the `Payload` in various ways other than using `typealias`.
 
 ```swift
-struct UserLoggedIn: EventProtocol {
+struct UserLoggedInEvent: EventProtocol {
     struct Payload {
         let user: User
     }
@@ -70,7 +70,7 @@ struct UserLoggedIn: EventProtocol {
 If you don't want to pass a `Payload`, use the `Void` type.
 
 ```swift
-struct UserLoggedIn: EventProtocol {
+struct UserLoggedInEvent: EventProtocol {
     let payload: Void = ()
 }
 ```
@@ -97,27 +97,27 @@ With `EventBus`, you can easily subscribe to and publish events. Access the shar
 
 ```swift
 // Subscribe
-let token = EventBus.shared.on(UserLoggedIn.self) { user in
+let token = EventBus.shared.on(UserLoggedInEvent.self) { user in
     print("\(user.name) has logged in.")
 }
 
 // Subscribe with a subscriber
-EventBus.shared.on(UserLoggedIn.self, by: self) { subscriber, user in
+EventBus.shared.on(UserLoggedInEvent.self, by: self) { subscriber, user in
     print("\(user.name) has logged in.")
 }
 
 // Publish
-EventBus.shared.emit(UserLoggedIn(payload: user)) 
+EventBus.shared.emit(UserLoggedInEvent(payload: user)) 
 ```
 
 You can unsubscribe by providing either the `SubscriptionToken` or the subscriber object.
 
 ```swift
 // Unsubscribe with a token
-EventBus.shared.off(UserLoggedIn.self, by: token)
+EventBus.shared.off(UserLoggedInEvent.self, by: token)
 
 // Unsubscribe with a subscriber
-EventBus.shared.off(UserLoggedIn.self, by: self)
+EventBus.shared.off(UserLoggedInEvent.self, by: self)
 ```
 
 You can cancel all event subscriptions by providing the subscriber object.

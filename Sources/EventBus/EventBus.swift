@@ -58,7 +58,7 @@ public final class EventBus {
     ///
     /// - Example:
     ///   ```swift
-    ///   eventBus.on(UserLoggedIn.self, by: self) { subscriber, payload in
+    ///   eventBus.on(UserLoggedInEvent.self, by: self) { subscriber, payload in
     ///       print("\(payload.name) has logged in!")
     ///   }
     ///   ```
@@ -156,7 +156,7 @@ public final class EventBus {
     ///
     /// - Example:
     ///   ```swift
-    ///   eventBus.emit(UserLoggedIn(payload: user))
+    ///   eventBus.emit(UserLoggedInEvent(payload: user))
     ///   ```
     public func emit<Event: EventProtocol>(_ event: Event) {
         read {
