@@ -21,9 +21,9 @@ public final class EventBus {
 
     /// Configuration settings for `EventBus`.
     public struct Config {
-        /// An optional custom token provider.
         var tokenProvider: TokenProvider?
         var cleanFrequency: AutoCleaner.Frequency?
+        var dispatchQueue: DispatchQueue?
     }
 
     struct Subscription {
@@ -35,11 +35,12 @@ public final class EventBus {
     let tokenProvider: TokenProvider
     let cleanFrequency: AutoCleaner.Frequency
 
-    private(set) var queue = DispatchQueue(label: "com.event-bus.queue", attributes: .concurrent)
+    private(set) var queue: DispatchQueue
     private func read<T>(_ action: () -> T) -> T { queue.sync { action() } }
     private func write<T>(_ action: () -> T) -> T { queue.sync(flags: .barrier) { action() } }
 
     public init(config: Config? = nil) {
+        self.queue = config?.dispatchQueue ?? DispatchQueue(label: "com.event-bus.queue", attributes: .concurrent)
         self.tokenProvider = config?.tokenProvider ?? { DefaultToken() }
         self.cleanFrequency = config?.cleanFrequency ?? { count in
             let interval = (min: 10.0, max: 120.0)
