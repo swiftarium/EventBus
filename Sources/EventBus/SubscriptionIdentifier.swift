@@ -1,3 +1,4 @@
+import Foundation
 import WeakRef
 
 enum SubscriptionIdentifier: Hashable {
@@ -12,20 +13,17 @@ enum SubscriptionIdentifier: Hashable {
     }
 
     static func == (lhs: SubscriptionIdentifier, rhs: SubscriptionIdentifier) -> Bool {
-        switch (lhs, rhs) {
-        case let (.token(lhsToken), .token(rhsToken)):
-            return lhsToken.id == rhsToken.id
-        case let (.subscriber(lhsSubscriber), .subscriber(rhsSubscriber)):
-            return lhsSubscriber == rhsSubscriber
-        default:
-            return false
-        }
+        lhs.hashValue == rhs.hashValue
     }
 
     func hash(into hasher: inout Hasher) {
         switch self {
-        case let .token(token): hasher.combine(token.id)
-        case let .subscriber(subscriber): hasher.combine(subscriber)
+        case let .token(token):
+            hasher.combine(token.id)
+        case let .subscriber(subscriber):
+            subscriber.isValid
+                ? hasher.combine(subscriber)
+                : hasher.combine(UUID())
         }
     }
 }

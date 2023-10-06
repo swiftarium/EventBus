@@ -54,10 +54,10 @@ final class EventBusTests: XCTestCase {
         eventBus.emit(TestEvent(payload: value))
         waitForExpectations(timeout: 1.0)
     }
-    
+
     func testSubscriberIsNil() {
         let optionalSubscriber: TestSubscriber? = nil
-        eventBus.on(TestEvent.self, by: optionalSubscriber) { subscriber, payload in
+        eventBus.on(TestEvent.self, by: optionalSubscriber) { _, _ in
             XCTFail("Callback should not be called if subscriber not exists")
         }
 
@@ -85,8 +85,8 @@ final class EventBusTests: XCTestCase {
         let iterations = 100000
         let expect = expectation(description: "multiple subscribe by subscriber")
         expect.expectedFulfillmentCount = iterations
-        
-        let subscribers = (1...iterations).map { _ in TestSubscriber() }
+
+        let subscribers = (1 ... iterations).map { _ in TestSubscriber() }
         subscribers.forEach { subscriber in
             eventBus.on(TestEvent.self, by: subscriber) { [weak subscriber] sub, payload in
                 XCTAssertIdentical(subscriber, sub)
@@ -202,6 +202,14 @@ final class EventBusTests: XCTestCase {
         waitForExpectations(timeout: 1.0)
     }
 
+    func testSubscribeWithNilObject() {
+        let subscriber1: TestSubscriber? = nil
+        eventBus.on(TestEvent.self, by: subscriber1) { _, _ in
+            XCTFail("Callback should not be called")
+        }
+        eventBus.emit(TestEvent(payload: ""))
+    }
+
     func testWeakReferences() {
         let expect = expectation(description: "weak references")
 
@@ -228,6 +236,17 @@ final class EventBusTests: XCTestCase {
 
         eventBus.emit(TestEvent(payload: value))
         waitForExpectations(timeout: 1.0)
+    }
+
+    func testSubscribeAfterReleasing() {
+        var subscriber1: TestSubscriber? = .init()
+
+        for _ in 1 ... 10000 {
+            eventBus.on(TestEvent.self, by: subscriber1) { _, _ in }
+
+            subscriber1 = nil
+            subscriber1 = .init()
+        }
     }
 
     func testCallbackPayload() {

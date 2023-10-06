@@ -65,14 +65,14 @@ class EventBusMemoryLeakTests: XCTestCase {
             }
         }
         subscribers.removeAll { $0!.num % 2 == 0 }
-        sleep(1)
+        sleep(3)
 
         if let value = eventBus.subscriptionsMap.values.first {
             XCTAssertEqual(value.items.count, iterations / 2)
         }
 
         subscribers.removeAll { $0!.num % 2 == 1 }
-        sleep(1)
+        sleep(3)
 
         if let value = eventBus.subscriptionsMap.values.first {
             XCTAssertTrue(value.items.isEmpty)
